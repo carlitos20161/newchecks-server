@@ -1,0 +1,141 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // === USERS ===
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // === COMPANIES ===
+    match /companies/{companyId} {
+      allow get: if isAdmin() || isAuthorizedFor(companyId);
+      allow list: if isAdmin() || isAuthenticated();
+      
+      // ✅ FIXED: Allow regular users to update nextCheckNumber
+      allow update: if isAdmin() || (
+        isActive() &&
+        isAuthorizedFor(companyId) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(["nextCheckNumber"]) &&
+        (request.resource.data.nextCheckNumber is int) &&
+        (resource.data.nextCheckNumber is int) &&
+        request.resource.data.nextCheckNumber >= resource.data.nextCheckNumber
+      );
+      
+      allow create, delete: if isAdmin();
+    }
+
+    // === CLIENTS ===
+    match /clients/{clientId} {
+      allow read: if isAdmin() || isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // === BANKS ===
+    match /banks/{bankId} {
+      allow read: if isAdmin() || isAuthenticated();
+      allow update: if isAdmin() || (
+        isActive() &&
+        isAuthorizedFor(resource.data.companyId) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(["nextCheckNumber"]) &&
+        (request.resource.data.nextCheckNumber is int) &&
+        (resource.data.nextCheckNumber is int) &&
+        request.resource.data.nextCheckNumber >= resource.data.nextCheckNumber
+      );
+      allow write: if isAdmin();
+    }
+
+    match /employees/{employeeId} {
+      allow list: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // === CHECKS ===
+    match /checks/{checkId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() &&
+        resource != null &&  
+        resource.data.companyId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyIds
+      );
+      
+      allow create: if isAdmin() || (
+        isAuthenticated() &&
+        (request.resource.data.companyId is string) &&
+        isAuthorizedFor(request.resource.data.companyId)
+      );
+      
+      allow update: if isAdmin() || (
+        isActive() &&
+        (request.resource.data.companyId is string) &&
+        isAuthorizedFor(request.resource.data.companyId)
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    // === REVIEW REQUESTS ===
+    match /reviewRequest/{requestId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        resource.data.createdBy == request.auth.uid
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // === HELPER FUNCTIONS ===
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isActive() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isAuthorizedFor(companyId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() &&
+        userDoc.exists() &&
+        (companyId is string) &&
+        (
+          (userDoc.data.companyIds is list && companyId in userDoc.data.companyIds) ||
+          (userDoc.data.companyId is string && userDoc.data.companyId == companyId) ||
+          (userDoc.data.companyIds is string && userDoc.data.companyIds == companyId)
+        );
+    }
+
+    function canListChecks() {
+      return isAuthenticated() &&
+        size(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyIds) > 0;
+    }
+
+    function canReadEmployee(employeeId) {
+      let emp = get(/databases/$(database)/documents/employees/$(employeeId)).data;
+      return isAuthorizedFor(emp.companyId) ||
+        (emp.companyIds is list &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyIds.hasAny(emp.companyIds));
+    }
+
+    function canListEmployees() {
+      return isAuthenticated();
+    }
+
+    function canReadCheck(checkId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let checkDoc = get(/databases/$(database)/documents/checks/$(checkId));
+
+      return isAuthenticated() &&
+        userDoc.exists() &&
+        checkDoc.exists() &&
+        checkDoc.data.companyId in (userDoc.data.companyIds || []);
+    }
+  }
+} 
