@@ -905,7 +905,7 @@ const [userLoaded, setUserLoaded] = useState(false);
     if (!companyId || !weekKey) return;
     try {
       const response = await fetch(
-                  `http://10.0.0.240:5004/api/print_week?companyId=${companyId}&weekKey=${weekKey}`
+                  `http://192.168.1.240:5004/api/print_week?companyId=${companyId}&weekKey=${weekKey}`
       );
       if (!response.ok) {
         alert('Error fetching PDF.');
@@ -951,7 +951,7 @@ const [userLoaded, setUserLoaded] = useState(false);
     }
     const checkIds = reviewedChecks.map((c: any) => c.id);
     try {
-              const response = await fetch('http://10.0.0.240:5004/api/print_selected_checks', {
+              const response = await fetch('http://192.168.1.240:5004/api/print_selected_checks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ checkIds, weekKey })
@@ -1043,7 +1043,7 @@ const [userLoaded, setUserLoaded] = useState(false);
       console.log('Printing selected checks:', selectedChecksList);
       
       try {
-        const response = await fetch('http://10.0.0.240:5004/api/print_selected_checks', {
+        const response = await fetch('http://192.168.1.240:5004/api/print_selected_checks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ checkIds: selectedChecksList, weekKey: selectedWeekKey })

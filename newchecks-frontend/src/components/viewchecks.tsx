@@ -480,7 +480,7 @@ const handleMarkCheckReviewed = async () => {
   const handlePrintWeek = async (weekKey: string) => {
     if (!selectedCompanyId) return;
     const response = await fetch(
-                  `http://10.0.0.240:5004/api/print_week?companyId=${selectedCompanyId}&weekKey=${weekKey}`
+                  `http://192.168.1.240:5004/api/print_week?companyId=${selectedCompanyId}&weekKey=${weekKey}`
     );
     if (!response.ok) {
       alert('Error fetching PDF.');
